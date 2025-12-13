@@ -1,0 +1,38 @@
+# {{ ansible_managed }}
+
+data_dir: "/var/lib/vector"
+
+api:
+  enabled: true
+  address: "0.0.0.0:8686"
+  playground: false
+
+sources:
+  generated_logs:
+    type: demo_logs
+    format: json
+    interval: 1
+  
+  internal_metrics:
+    type: internal_metrics
+    scrape_interval_secs: 15
+
+sinks:
+  to_clickhouse:
+    type: clickhouse
+    inputs:
+      - generated_logs
+    endpoint: "http://{{ clickhouse_host }}:8123"
+    database: "logs"
+    table: "logs"
+    compression: gzip
+    skip_unknown_fields: true
+    batch:
+      max_events: 10000
+      timeout_secs: 5
+      
+  prometheus_exporter:
+    type: prometheus_exporter
+    inputs:
+      - internal_metrics
+    address: "0.0.0.0:9598"
