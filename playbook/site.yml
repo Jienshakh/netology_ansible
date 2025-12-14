@@ -8,17 +8,20 @@
         name: clickhouse-server
         state: restarted
   tasks:
-    - block:
+    - name: Download ClickHouse packages
+      block:
         - name: Get clickhouse distrib
           ansible.builtin.get_url:
             url: "https://packages.clickhouse.com/rpm/stable/{{ item }}-{{ clickhouse_version }}.noarch.rpm"
             dest: "./{{ item }}-{{ clickhouse_version }}.rpm"
+            mode: '0644'
           with_items: "{{ clickhouse_packages }}"
       rescue:
         - name: Get clickhouse distrib
           ansible.builtin.get_url:
             url: "https://packages.clickhouse.com/rpm/stable/clickhouse-common-static-{{ clickhouse_version }}.x86_64.rpm"
             dest: "./clickhouse-common-static-{{ clickhouse_version }}.rpm"
+            mode: '0644'
     - name: Install clickhouse packages
       become: true
       ansible.builtin.dnf:
@@ -26,25 +29,29 @@
           - clickhouse-common-static-{{ clickhouse_version }}.rpm
           - clickhouse-client-{{ clickhouse_version }}.rpm
           - clickhouse-server-{{ clickhouse_version }}.rpm
-        disable_gpg_check: yes
+        disable_gpg_check: true
       notify: Start clickhouse service
     - name: Flush handlers
-      meta: flush_handlers
+      ansible.builtin.meta: flush_handlers
+    - name: Wait for ClickHouse TCP port
+      ansible.builtin.wait_for:
+        port: 9000
+        delay: 5
+        timeout: 60
     - name: Create database
       ansible.builtin.command: "clickhouse-client -q 'create database logs;'"
       register: create_db
-      failed_when: create_db.rc != 0 and create_db.rc !=82
+      failed_when: create_db.rc != 0 and create_db.rc != 82
       changed_when: create_db.rc == 0
     - name: Enable ClickHouse external access
       become: true
-      blockinfile:
+      ansible.builtin.blockinfile:
         path: /etc/clickhouse-server/config.xml
         block: |
           <listen_host>::1</listen_host>
           <listen_host>0.0.0.0</listen_host>
         insertafter: '<http_port>8123</http_port>'
       notify: Start clickhouse service
-
 - name: Install Vector
   hosts: vector
   handlers:
@@ -58,16 +65,16 @@
       ansible.builtin.get_url:
         url: "https://yum.vector.dev/stable/vector-0/x86_64/vector-{{ vector_version }}.x86_64.rpm"
         dest: "./vector-{{ vector_version }}.rpm"
+        mode: '0644'
     - name: Install vector
       become: true
       ansible.builtin.yum:
         name:
           - vector-{{ vector_version }}.rpm
-        disable_gpg_check: yes
+        disable_gpg_check: true
       notify: Start vector service
     - name: Flush handlers
-      meta: flush_handlers
-      
+      ansible.builtin.meta: flush_handlers
 - name: Configure Vector
   hosts: vector
   vars:
@@ -85,7 +92,6 @@
         path: /etc/vector
         state: directory
         mode: '0755'
-        
     - name: Deploy Vector configuration
       become: true
       ansible.builtin.template:
@@ -93,10 +99,9 @@
         dest: /etc/vector/vector.yaml
         mode: '0644'
       notify: Restart vector
-      
     - name: Ensure Vector is running
       become: true
       ansible.builtin.service:
         name: vector
         state: started
-        enabled: yes
+        enabled: true
