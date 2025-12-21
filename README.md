@@ -17,6 +17,8 @@
 Архитектура: **Vector** (сбор логов) → **ClickHouse** (хранение) ← **Lighthouse** (визуализация)
 
 ## Структура проекта
+
+```
 .
 ├── group_vars/
 │   ├── clickhouse/
@@ -33,6 +35,7 @@
 │   └── vector.yaml.j2        # Конфиг Vector
 ├── site.yml                  # Основной playbook
 └── uninstall_all.yml         # Playbook для удаления
+```
 
 ## Теги
 
