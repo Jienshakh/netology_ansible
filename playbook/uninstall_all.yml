@@ -1,0 +1,110 @@
+---
+- name: Uninstall Vector
+  hosts: vector
+  gather_facts: false
+  handlers:
+    - name: Systemd Daemon Reload
+      become: true
+      ansible.builtin.systemd:
+        daemon_reload: true
+  tasks:
+    - name: Uninstall Vector completely
+      tags: vector
+      block:
+        - name: Stop vector daemon
+          become: true
+          ansible.builtin.service:
+            name: vector.service
+            state: stopped
+        - name: Uninstall nginx
+          become: true
+          ansible.builtin.yum:
+            name: vector
+            state: absent
+            autoremove: true
+        - name: Remove vector user
+          become: true
+          ansible.builtin.user:
+            name: "vector"
+            state: absent
+            remove: true
+- name: Uninstall Clickhouse
+  hosts: clickhouse
+  gather_facts: false
+  handlers:
+    - name: Systemd Daemon Reload
+      become: true
+      ansible.builtin.systemd:
+        daemon_reload: true
+  tasks:
+    - name: Uninstall Clickhoue completely
+      tags: clickhouse
+      block:
+        - name: Drop DB logs
+          ansible.builtin.command: "clickhouse-client --host localhost --port 9000 -q 'drop database logs;'"
+          ignore_errors: true
+          register: drop_db
+          changed_when: drop_db.rc == 0 or drop_db.rc == 81
+        - name: Stop clickhouse-server.service daemon
+          become: true
+          ansible.builtin.service:
+            name: clickhouse-server
+            state: stopped
+        - name: Remove clickhouse files
+          become: true
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "/var/lib/clickhouse"
+            - "/etc/clickhouse-server"
+            - "/etc/clickhouse-client"
+            - "./clickhouse-common-static_{{ clickhouse_version }}.rpm"
+            - "./clickhouse-client_{{ clickhouse_version }}.rpm"
+            - "./clickhouse-server_{{ clickhouse_version }}.rpm"
+        - name: Uninstall packages
+          become: true
+          ansible.builtin.yum:
+            name:
+              - clickhouse-common-static
+              - clickhouse-client
+              - clickhouse-server
+            state: absent
+          notify: Systemd Daemon Reload
+- name: Uninstall Nginx
+  hosts: lighthouse
+  gather_facts: false
+  tasks:
+    - name: Uninstall Nginx completely
+      tags: nginx
+      block:
+        - name: Uninstall nginx
+          become: true
+          ansible.builtin.yum:
+            name: nginx
+            state: absent
+            autoremove: true
+        - name: Remove nginx conf files
+          become: true
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "/etc/nginx/conf.d/default.conf"
+            - "/etc/nginx/nginx.conf"
+- name: Uninstall git and lighthouse
+  hosts: lighthouse
+  gather_facts: false
+  tasks:
+    - name: Uninstall git
+      become: true
+      ansible.builtin.yum:
+        name: git
+        state: absent
+        autoremove: true
+    - name: Remove lighthouse dir
+      become: true
+      ansible.builtin.file:
+        path: "{{ lighthouse_location_dir }}"
+        state: absent
+      tags: lighthouse

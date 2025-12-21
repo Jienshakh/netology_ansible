@@ -10,13 +10,9 @@ api:
 sources:
   generated_logs:
     type: demo_logs
-    format: json
+    format: syslog
     interval: 1
   
-  internal_metrics:
-    type: internal_metrics
-    scrape_interval_secs: 15
-
 sinks:
   to_clickhouse:
     type: clickhouse
@@ -25,14 +21,9 @@ sinks:
     endpoint: "http://{{ clickhouse_host }}:8123"
     database: "logs"
     table: "logs"
+    acknowledgements:
+      enabled: false
+    healthcheck:
+      enabled: false
     compression: gzip
     skip_unknown_fields: true
-    batch:
-      max_events: 10000
-      timeout_secs: 5
-      
-  prometheus_exporter:
-    type: prometheus_exporter
-    inputs:
-      - internal_metrics
-    address: "0.0.0.0:9598"
