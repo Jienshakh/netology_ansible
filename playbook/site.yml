@@ -5,9 +5,8 @@
     - lighthouse-role
 - name: Install Clickhouse
   hosts: clickhouse
-  gather_facts: yes
   roles:
-    - clickhouse
+    - clickhouse-role
 - name: Install Vector
   hosts: vector
   vars:
